@@ -33,3 +33,4 @@ dist-ssr
 
 # Local Claude Code config
 .claude/
+.env.lovable.bak

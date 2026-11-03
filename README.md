@@ -35,6 +35,7 @@ Apply the SQL files in `drizzle/migrations/` in order (Supabase → SQL Editor, 
 1. `0000_migration.sql` – tables, roles, row-level security (already applied by Lovable)
 2. `0001_orders_server_side.sql` – orders go through `place_order()`, which prices them on the server, checks opening hours and rate-limits; customer tracking via `order_status()`
 3. `0002_daily_maintenance.sql` – `daily_maintenance()`: deletes orders older than 12 months
+4. `0003_storage_and_grants.sql` – creates the `media` bucket; stops visitors calling internal functions
 
 After creating the owner's account at `/admin`, turn off new sign-ups in Supabase → Authentication → Sign In / Providers.
 
