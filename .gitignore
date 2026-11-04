@@ -34,3 +34,6 @@ dist-ssr
 # Local Claude Code config
 .claude/
 .env.lovable.bak
+
+# Netlify local state and build output
+.netlify

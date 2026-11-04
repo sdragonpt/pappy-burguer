@@ -1,0 +1,9 @@
+# TanStack Start built by Nitro: static files go to dist/, the server (SSR) to .netlify/functions-internal.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Nitro auto-detects Netlify in its CI; pinned so local `netlify deploy --build` builds the same thing.
+  NITRO_PRESET = "netlify"
