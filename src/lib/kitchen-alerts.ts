@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { askNotificationPermission, notificationsSupported, playTones, registerNotifier, showNotification, unlockAudio } from "@/lib/alerts";
 
 /**
  * Alerts for a tablet left open on the orders page:
@@ -11,35 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const REPEAT_MS = 20_000;
 const PREF_KEY = "pappy-kitchen-alerts";
 
-let audioCtx: AudioContext | null = null;
-
-function chime() {
-  if (!audioCtx || audioCtx.state !== "running") return;
-  const ctx = audioCtx;
-  [880, 1320, 880, 1320].forEach((f, i) => {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.frequency.value = f;
-    o.connect(g).connect(ctx.destination);
-    const t = ctx.currentTime + i * 0.2;
-    g.gain.setValueAtTime(0.35, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-    o.start(t);
-    o.stop(t + 0.3);
-  });
-}
-
-async function showNotification(title: string, body: string, tag: string) {
-  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-  try {
-    // Android Chrome only shows notifications through a service worker.
-    const reg = await navigator.serviceWorker?.getRegistration("/admin");
-    if (reg) await reg.showNotification(title, { body, tag, icon: "/apple-touch-icon.png", requireInteraction: true });
-    else new Notification(title, { body, tag, icon: "/apple-touch-icon.png" });
-  } catch {
-    /* notifications unavailable */
-  }
-}
+const chime = () => playTones([880, 1320, 880, 1320]);
 
 export function useKitchenAlerts(waiting: number) {
   const [wanted, setWanted] = useState(false);
@@ -54,8 +27,8 @@ export function useKitchenAlerts(waiting: number) {
     } catch {
       /* storage unavailable */
     }
-    setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
-    navigator.serviceWorker?.register("/admin-sw.js", { scope: "/admin" }).catch(() => {});
+    setPermission(notificationsSupported() ? Notification.permission : "unsupported");
+    registerNotifier("/admin");
   }, []);
 
   const requestWakeLock = useCallback(async () => {
@@ -71,12 +44,8 @@ export function useKitchenAlerts(waiting: number) {
 
   /** Must run from a tap: unlocks audio, asks for notification permission and keeps the screen on. */
   const enable = useCallback(async () => {
-    audioCtx ??= new AudioContext();
-    await audioCtx.resume().catch(() => {});
-    setSoundReady(audioCtx.state === "running");
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      setPermission(await Notification.requestPermission());
-    }
+    setSoundReady(await unlockAudio());
+    setPermission(await askNotificationPermission());
     await requestWakeLock();
     setWanted(true);
     setMuted(false);
@@ -114,7 +83,7 @@ export function useKitchenAlerts(waiting: number) {
   const onNewOrder = useCallback(
     (o: { customer_name: string; pickup_time: string; public_code: string }) => {
       if (!muted) chime();
-      showNotification("Nuovo ordine!", `${o.customer_name} · ritiro ${o.pickup_time}`, o.public_code);
+      showNotification("/admin", "Nuovo ordine!", `${o.customer_name} · ritiro ${o.pickup_time}`, o.public_code, "/admin");
     },
     [muted],
   );

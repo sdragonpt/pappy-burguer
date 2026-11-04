@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Circle, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, CheckCircle2, Circle, PartyPopper, XCircle } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { euro } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { askNotificationPermission, audioReady, notificationsSupported, playTones, registerNotifier, showNotification, unlockAudio } from "@/lib/alerts";
 
 export const Route = createFileRoute("/ordine/$code")({
   validateSearch: (search: Record<string, unknown>): { nuovo?: boolean } => (search["nuovo"] ? { nuovo: true } : {}),
@@ -39,6 +41,25 @@ function Tracking() {
   });
 
   const current = data ? STEPS.indexOf(data.status as (typeof STEPS)[number]) : -1;
+  const ready = data?.status === "pronto";
+
+  // Alert only on the change to "pronto" seen by this page, not when it is opened on an order that is already ready.
+  const prevStatus = useRef<string | null>(null);
+  useEffect(() => {
+    const status = data?.status ?? null;
+    if (prevStatus.current && prevStatus.current !== "pronto" && status === "pronto") {
+      playTones([523, 659, 784, 1047, 784, 1047], 0.18);
+      navigator.vibrate?.([300, 150, 300, 150, 600]);
+      showNotification("/ordine", t("track.readyTitle"), t("track.readyBody", { code }), `ready-${code}`, `/ordine/${code}`);
+    }
+    prevStatus.current = status;
+  }, [data?.status, code, t]);
+
+  useEffect(() => {
+    if (ready) document.title = `✅ ${t("track.pronto")} · ${code} · Pappy Burger`;
+  }, [ready, code, t]);
+
+  const waitingForKitchen = data?.status === "nuovo" || data?.status === "in preparazione";
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -57,6 +78,13 @@ function Tracking() {
             {nuovo && <p className="mb-2 text-center text-lg font-bold text-accent">{t("track.received")}</p>}
             <h1 className="text-center text-3xl font-black">{t("track.title", { code })}</h1>
             <p className="mt-1 text-center text-muted-foreground">{t("track.pickupAt", { time: data.pickup_time })}</p>
+
+            {ready && (
+              <p role="status" className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-accent p-4 text-center text-lg font-black text-accent-foreground">
+                <PartyPopper className="h-6 w-6 shrink-0" /> {t("track.readyBanner")}
+              </p>
+            )}
+            {waitingForKitchen && <NotifyMe />}
 
             {data.status === "annullato" ? (
               <div className="mt-8 flex flex-col items-center gap-2 text-center">
@@ -93,6 +121,32 @@ function Tracking() {
         )}
       </main>
       <SiteFooter />
+    </div>
+  );
+}
+
+/** Opt-in for the "order ready" alert. The tap unlocks sound (browsers require one) and asks for notifications. */
+function NotifyMe() {
+  const { t } = useI18n();
+  const [state, setState] = useState<"off" | "on" | "sound-only">("off");
+  useEffect(() => {
+    registerNotifier("/ordine");
+    // Placing the order was already a tap on this page, so sound may be unlocked and permission already given.
+    if (audioReady() && notificationsSupported() && Notification.permission === "granted") setState("on");
+  }, []);
+
+  async function enable() {
+    await unlockAudio();
+    const permission = await askNotificationPermission();
+    setState(permission === "granted" ? "on" : "sound-only");
+    playTones([784, 1047], 0.15, 0.2);
+  }
+
+  if (state !== "off")
+    return <p className="mt-6 text-center text-sm text-muted-foreground">{t(state === "on" ? "track.notifyOn" : "track.notifyDenied")}</p>;
+  return (
+    <div className="mt-6 text-center">
+      <Button onClick={enable}><Bell className="h-4 w-4" /> {t("track.notifyMe")}</Button>
     </div>
   );
 }

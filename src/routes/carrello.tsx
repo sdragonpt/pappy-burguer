@@ -13,6 +13,7 @@ import { settingsQuery } from "@/lib/site";
 import { pickupSlots } from "@/lib/hours";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { unlockAudio } from "@/lib/alerts";
 
 export const Route = createFileRoute("/carrello")({
   head: () => ({
@@ -53,6 +54,8 @@ function Cart() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // This tap is the customer's last one before the tracking page: use it to allow the "order ready" sound later.
+    void unlockAudio();
     setErr("");
     setSending(true);
     const { data, error } = await supabase.rpc("place_order", {

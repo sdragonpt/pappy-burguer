@@ -75,6 +75,12 @@ const it = {
   "track.received": "Ordine ricevuto!",
   "track.keep": "Tieni aperta questa pagina: si aggiorna da sola.",
   "track.back": "Torna al menu",
+  "track.notifyMe": "Avvisami quando è pronto",
+  "track.notifyOn": "Ti avviseremo con un suono e una notifica quando è pronto. Tieni aperta questa pagina, anche in secondo piano.",
+  "track.notifyDenied": "Le notifiche sono bloccate nel browser: ti avviseremo solo con il suono, a pagina aperta.",
+  "track.readyBanner": "Il tuo ordine è pronto! Ti aspettiamo in negozio.",
+  "track.readyTitle": "Il tuo ordine è pronto! 🍔",
+  "track.readyBody": "Ordine {code} · passa a ritirarlo da Pappy Burger.",
 
   "about.title": "Chi siamo",
   "about.default":
@@ -175,6 +181,12 @@ const en: Record<Key, string> = {
   "track.received": "Order received!",
   "track.keep": "Keep this page open: it updates by itself.",
   "track.back": "Back to the menu",
+  "track.notifyMe": "Notify me when it's ready",
+  "track.notifyOn": "We'll alert you with a sound and a notification when it's ready. Keep this page open, even in the background.",
+  "track.notifyDenied": "Notifications are blocked in your browser: we'll only play a sound while the page is open.",
+  "track.readyBanner": "Your order is ready! Come and pick it up.",
+  "track.readyTitle": "Your order is ready! 🍔",
+  "track.readyBody": "Order {code} · come and pick it up at Pappy Burger.",
 
   "about.title": "About us",
   "about.default":
