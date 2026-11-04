@@ -57,6 +57,7 @@ function securityHeaders(): Record<string, string> {
       `img-src 'self' data: blob: ${supabase}`,
       "font-src 'self' data:",
       `connect-src 'self' ${supabase} ${supabaseWs}`,
+      "media-src 'self' blob:",
       "worker-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",

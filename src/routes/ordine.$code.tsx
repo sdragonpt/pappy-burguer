@@ -1,14 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Bell, CheckCircle2, Circle, PartyPopper, XCircle } from "lucide-react";
+import { Bell, CheckCircle2, Circle, PartyPopper, Volume2, XCircle } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { euro } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
-import { askNotificationPermission, audioReady, notificationsSupported, playTones, registerNotifier, showNotification, unlockAudio } from "@/lib/alerts";
+import { AUDIO_EVENT, askNotificationPermission, audioReady, notificationPermission, playTones, registerNotifier, showNotification, unblockHint, unlockAudio, type NotifyPermission } from "@/lib/alerts";
 
 export const Route = createFileRoute("/ordine/$code")({
   validateSearch: (search: Record<string, unknown>): { nuovo?: boolean } => (search["nuovo"] ? { nuovo: true } : {}),
@@ -37,7 +37,9 @@ function Tracking() {
       return data as Status;
     },
     retry: 1,
-    refetchInterval: (q) => (["ritirato", "annullato"].includes(q.state.data?.status ?? "") ? false : 15_000),
+    refetchInterval: (q) => (["ritirato", "annullato"].includes(q.state.data?.status ?? "") ? false : 10_000),
+    // Keep checking while the customer is in another tab or app; browsers slow this down but don't stop it.
+    refetchIntervalInBackground: true,
   });
 
   const current = data ? STEPS.indexOf(data.status as (typeof STEPS)[number]) : -1;
@@ -125,28 +127,53 @@ function Tracking() {
   );
 }
 
-/** Opt-in for the "order ready" alert. The tap unlocks sound (browsers require one) and asks for notifications. */
+/**
+ * Opt-in for the "order ready" alert. A tap is needed before the browser allows sound, and notifications
+ * need permission; when they are blocked or unsupported, explain why and how, instead of failing silently.
+ */
 function NotifyMe() {
-  const { t } = useI18n();
-  const [state, setState] = useState<"off" | "on" | "sound-only">("off");
+  const { t, lang } = useI18n();
+  const [sound, setSound] = useState(false);
+  const [permission, setPermission] = useState<NotifyPermission>("default");
   useEffect(() => {
     registerNotifier("/ordine");
-    // Placing the order was already a tap on this page, so sound may be unlocked and permission already given.
-    if (audioReady() && notificationsSupported() && Notification.permission === "granted") setState("on");
+    // Placing the order was already a tap on this page, so sound may already be (or soon be) unlocked.
+    const sync = () => setSound(audioReady());
+    sync();
+    setPermission(notificationPermission());
+    window.addEventListener(AUDIO_EVENT, sync);
+    return () => window.removeEventListener(AUDIO_EVENT, sync);
   }, []);
 
   async function enable() {
-    await unlockAudio();
-    const permission = await askNotificationPermission();
-    setState(permission === "granted" ? "on" : "sound-only");
-    playTones([784, 1047], 0.15, 0.2);
+    setSound(await unlockAudio());
+    setPermission(await askNotificationPermission());
+    playTones([784, 1047], 0.15);
   }
 
-  if (state !== "off")
-    return <p className="mt-6 text-center text-sm text-muted-foreground">{t(state === "on" ? "track.notifyOn" : "track.notifyDenied")}</p>;
+  if (!sound || permission === "default")
+    return (
+      <div className="mt-6 text-center">
+        <Button onClick={enable}><Bell className="h-4 w-4" /> {t("track.notifyMe")}</Button>
+      </div>
+    );
+
   return (
-    <div className="mt-6 text-center">
-      <Button onClick={enable}><Bell className="h-4 w-4" /> {t("track.notifyMe")}</Button>
+    <div className="mt-6 space-y-2 rounded-xl border border-border p-4 text-center text-sm">
+      <p className="font-bold text-accent">
+        {t(permission === "granted" ? "track.alertOnBoth" : "track.alertOnSound")}
+      </p>
+      {permission === "denied" && (
+        <p className="text-muted-foreground">
+          {t("track.notifyBlocked")} {unblockHint(lang)}{" "}
+          <button className="underline" onClick={() => setPermission(notificationPermission())}>{t("track.recheck")}</button>
+        </p>
+      )}
+      {permission === "unsupported" && <p className="text-muted-foreground">{t("track.notifyUnsupported")}</p>}
+      <p className="text-muted-foreground">{t("track.keepOpen")}</p>
+      <button className="underline" onClick={() => playTones([523, 659, 784, 1047, 784, 1047], 0.18)}>
+        <Volume2 className="mr-1 inline h-4 w-4" />{t("track.testSound")}
+      </button>
     </div>
   );
 }
