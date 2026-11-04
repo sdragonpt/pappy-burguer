@@ -1,7 +1,8 @@
 # Calls the daily_maintenance() database function once a day.
 # Keeps a Supabase Free project from pausing after 7 days without activity,
 # and deletes orders older than 12 months (see the privacy notice).
-# Needs two repository secrets: SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (the public anon/publishable key).
+# The URL and publishable key are public (the website ships them), so they are read from the committed .env.
+# Repository secrets or variables named SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY override them if set.
 # If the call fails, GitHub emails the repository owner, so this also works as a basic uptime alert.
 name: Daily maintenance
 
@@ -10,20 +11,32 @@ on:
     - cron: "17 4 * * *" # every day at 04:17 UTC
   workflow_dispatch: # "Run workflow" button for testing
 
+permissions:
+  contents: read
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .env
+          sparse-checkout-cone-mode: false
+
       - name: Call daily_maintenance
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          OVERRIDE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+          OVERRIDE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY || vars.SUPABASE_PUBLISHABLE_KEY }}
         run: |
+          from_env() { grep -E "^$1=" .env | head -1 | cut -d= -f2- | tr -d "\"'\r"; }
+          SUPABASE_URL="${OVERRIDE_URL:-$(from_env VITE_SUPABASE_URL)}"
+          SUPABASE_KEY="${OVERRIDE_KEY:-$(from_env VITE_SUPABASE_PUBLISHABLE_KEY)}"
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-            echo "Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY secret" >&2
+            echo "No Supabase URL/key found in .env or repository secrets" >&2
             exit 1
           fi
+          echo "Calling ${SUPABASE_URL%/}/rest/v1/rpc/daily_maintenance"
           curl --fail-with-body --silent --show-error --retry 3 --retry-delay 20 \
             -X POST "${SUPABASE_URL%/}/rest/v1/rpc/daily_maintenance" \
             -H "apikey: $SUPABASE_KEY" \
