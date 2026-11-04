@@ -21,6 +21,7 @@ create or replace function public.client_ip_hash()
 returns text
 language plpgsql
 stable
+set search_path = ''
 as $$
 declare
   v_headers json := nullif(current_setting('request.headers', true), '')::json;
