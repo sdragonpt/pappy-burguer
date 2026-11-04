@@ -45,10 +45,9 @@ Supabase pauses Free projects after 7 days without activity. The workflow
 `.github/workflows/daily-maintenance.yml` calls `daily_maintenance()` once a day, which counts as activity
 (a pg_cron job inside the database does not).
 
-1. Push this project to a **private** GitHub repository (GitHub disables scheduled workflows in public repos after 60 days without commits).
-2. In the repo: Settings → Secrets and variables → Actions → add
-   - `SUPABASE_URL` – e.g. `https://xxxx.supabase.co`
-   - `SUPABASE_PUBLISHABLE_KEY` – the public anon/publishable key (never the service-role key)
+1. Keep this project in a **private** GitHub repository (GitHub disables scheduled workflows in public repos after 60 days without commits).
+2. Nothing else to configure: the workflow reads the public Supabase URL and publishable key from `.env`.
+   Repository secrets or variables named `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` override them (never use the service-role key).
 3. Actions → Daily maintenance → **Run workflow** once to check it returns `{"ok":true,...}`.
 
 If a run fails, GitHub emails the repository owner.
