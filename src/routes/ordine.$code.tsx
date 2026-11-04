@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { euro } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
-import { AUDIO_EVENT, askNotificationPermission, audioReady, notificationPermission, playTones, registerNotifier, showNotification, unblockHint, unlockAudio, type NotifyPermission } from "@/lib/alerts";
+import { AUDIO_EVENT, askNotificationPermission, audioReady, isIOS, keepScreenOn, notificationPermission, playTones, registerNotifier, showNotification, unblockHint, unlockAudio, type NotifyPermission } from "@/lib/alerts";
 
 export const Route = createFileRoute("/ordine/$code")({
   validateSearch: (search: Record<string, unknown>): { nuovo?: boolean } => (search["nuovo"] ? { nuovo: true } : {}),
@@ -145,6 +145,9 @@ function NotifyMe() {
     return () => window.removeEventListener(AUDIO_EVENT, sync);
   }, []);
 
+  // While the alert is on and the order isn't ready, keep the screen lit (this component unmounts once it's ready).
+  useEffect(() => (sound ? keepScreenOn() : undefined), [sound]);
+
   async function enable() {
     setSound(await unlockAudio());
     setPermission(await askNotificationPermission());
@@ -170,7 +173,7 @@ function NotifyMe() {
         </p>
       )}
       {permission === "unsupported" && <p className="text-muted-foreground">{t("track.notifyUnsupported")}</p>}
-      <p className="text-muted-foreground">{t("track.keepOpen")}</p>
+      <p className="text-muted-foreground">{t(isIOS() ? "track.keepOpenIOS" : "track.keepOpen")}</p>
       <button className="underline" onClick={() => playTones([523, 659, 784, 1047, 784, 1047], 0.18)}>
         <Volume2 className="mr-1 inline h-4 w-4" />{t("track.testSound")}
       </button>

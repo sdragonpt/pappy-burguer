@@ -49,9 +49,15 @@ function setUnlocked(v: boolean) {
   window.dispatchEvent(new Event(AUDIO_EVENT));
 }
 
+export const isIOS = () =>
+  typeof navigator !== "undefined" && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
 /** Call from a tap. Plays a near-silent blip so the browser lets this page play sounds later. */
 export async function unlockAudio(): Promise<boolean> {
   try {
+    // Safari 16.4+: treat our sounds as media playback, which is not silenced by the iPhone mute switch.
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = "playback";
     player ??= new Audio();
     player.src = wavUrl([440], 0.05, 0.001);
     await player.play();
@@ -107,8 +113,7 @@ export async function showNotification(scope: string, title: string, body: strin
 
 /** Short platform hint for unblocking notifications, shown when the visitor previously refused them. */
 export function unblockHint(lang: "it" | "en") {
-  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
-  const ios = /iPhone|iPad|iPod/.test(ua);
+  const ios = isIOS();
   if (lang === "en")
     return ios
       ? "Settings → Notifications → Safari (or the Home Screen app) → Allow."
@@ -116,4 +121,30 @@ export function unblockHint(lang: "it" | "en") {
   return ios
     ? "Impostazioni → Notifiche → Safari (o l'app nella schermata Home) → Consenti."
     : "Tocca l'icona 🔒 accanto all'indirizzo → Notifiche → Consenti, poi ricarica la pagina.";
+}
+
+/**
+ * Keeps the screen on while `active` (Safari 16.4+, Chrome). On iPhone the page stops running as soon as the screen
+ * locks or the customer switches app, so a lit screen is the only way the "ready" alert can still fire.
+ * The lock is dropped by the browser when the page is hidden, so it is taken again when the page comes back.
+ */
+export function keepScreenOn(): () => void {
+  let lock: WakeLockSentinel | null = null;
+  let stopped = false;
+  const take = async () => {
+    if (stopped || lock || document.visibilityState !== "visible" || !("wakeLock" in navigator)) return;
+    try {
+      lock = await navigator.wakeLock.request("screen");
+      lock.addEventListener("release", () => (lock = null));
+    } catch {
+      /* not allowed, e.g. low-power mode */
+    }
+  };
+  take();
+  document.addEventListener("visibilitychange", take);
+  return () => {
+    stopped = true;
+    document.removeEventListener("visibilitychange", take);
+    lock?.release().catch(() => {});
+  };
 }
