@@ -50,8 +50,35 @@ export const categoryLabel = (c: string, lang: Lang) => (lang === "en" ? (CATEGO
 
 export const MAPS_URL = "https://maps.app.goo.gl/3wXmUQsGThtpSeFK7";
 
+const MAX_IMAGE_SIDE = 1600;
+
+/**
+ * Phone photos are often 4000px and several MB, which makes the menu slow on mobile data.
+ * Scales the longest side down to MAX_IMAGE_SIDE and re-encodes as WebP (keeps transparency for logos).
+ * SVG/GIF and anything the browser can't decode are uploaded unchanged.
+ */
+export async function shrinkImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.type === "image/gif") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
+    // Keep the original if re-encoding didn't help (already small, or WebP unsupported).
+    if (!blob || blob.type !== "image/webp" || (scale === 1 && blob.size >= file.size)) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}
+
 /** Uploads a file to storage and returns a long-lived link. */
-export async function uploadImage(file: File) {
+export async function uploadImage(original: File) {
+  const file = await shrinkImage(original);
   const path = `${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, "_")}`;
   const { error } = await supabase.storage.from("media").upload(path, file, { upsert: false });
   if (error) throw error;

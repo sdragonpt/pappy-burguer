@@ -22,9 +22,10 @@ export function MenuCard({ item: m, canOrder }: { item: MenuItem; canOrder: bool
 
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl bg-card">
-      <div className="aspect-[4/3] bg-muted">
+      {/* The image is taken out of the flow so a tall photo can't stretch the 4:3 frame; it is cropped to fill it instead. */}
+      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         {m.image_url ? (
-          <img src={m.image_url} alt={name} loading="lazy" className="h-full w-full object-cover" />
+          <img src={m.image_url} alt={name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div className="flex h-full items-center justify-center font-display text-3xl text-muted-foreground/50">Pappy</div>
         )}

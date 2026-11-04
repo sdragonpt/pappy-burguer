@@ -15,7 +15,7 @@ function Logo() {
   // Falls back to the name if an uploaded logo link stops working.
   if (broken) return <span className="font-display text-2xl font-black">{name}</span>;
   return (
-    <img src={data?.logo_url || defaultLogo} alt={name} onError={() => setBroken(true)} width={800} height={285} className="h-11 w-auto object-contain md:h-12" />
+    <img src={data?.logo_url || defaultLogo} alt={name} onError={() => setBroken(true)} width={800} height={285} className="h-11 w-auto max-w-[45vw] object-contain md:h-12 md:max-w-60" />
   );
 }
 

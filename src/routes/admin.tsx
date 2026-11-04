@@ -472,7 +472,7 @@ function SettingsEditor() {
       <div className="sm:col-span-2">
         <Label htmlFor="s-logo">Logo</Label>
         <div className="flex items-center gap-3">
-          {f.logo_url && <img src={f.logo_url} alt="" className="h-16 rounded-md" />}
+          {f.logo_url && <img src={f.logo_url} alt="" className="h-16 max-w-48 rounded-md object-contain" />}
           <Input id="s-logo" type="file" accept="image/*" onChange={(e) => onLogo(e.target.files?.[0])} />
           {f.logo_url && <Button variant="secondary" onClick={() => setF({ ...f, logo_url: null })}>Usa logo originale</Button>}
         </div>
