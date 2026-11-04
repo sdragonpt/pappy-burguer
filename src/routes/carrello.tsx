@@ -27,7 +27,7 @@ export const Route = createFileRoute("/carrello")({
   component: Cart,
 });
 
-const SERVER_ERRORS = ["ordering_closed", "invalid_time", "invalid_phone", "invalid_name", "item_unavailable", "rate_limited"] as const;
+const SERVER_ERRORS = ["ordering_closed", "invalid_time", "invalid_phone", "invalid_name", "item_unavailable", "rate_limited", "kitchen_busy"] as const;
 
 function Cart() {
   const { lines, setQty, total, clear } = useCart();

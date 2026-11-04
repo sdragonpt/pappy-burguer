@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
@@ -16,6 +16,7 @@ import { menuQuery, settingsQuery, uploadImage, CATEGORIES, type ItemOption, typ
 import { ALLERGENS } from "@/lib/allergens";
 import { WEEK_ORDER, dayName, type OpeningHours } from "@/lib/hours";
 import { euro } from "@/lib/cart";
+import { OrdersPanel } from "@/components/admin/OrdersPanel";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -72,7 +73,7 @@ function Admin() {
           <TabsTrigger value="orari">Orari</TabsTrigger>
           <TabsTrigger value="sito">Logo e info</TabsTrigger>
         </TabsList>
-        <TabsContent value="ordini"><Orders /></TabsContent>
+        <TabsContent value="ordini"><OrdersPanel /></TabsContent>
         <TabsContent value="menu"><MenuEditor /></TabsContent>
         <TabsContent value="orari"><HoursEditor /></TabsContent>
         <TabsContent value="sito"><SettingsEditor /></TabsContent>
@@ -137,111 +138,6 @@ function Login() {
         </button>
       )}
     </form>
-  );
-}
-
-type OrderLine = { id: string; name: string; qty: number; options?: string[] };
-type Order = { id: string; public_code: string; customer_name: string; phone: string; pickup_time: string; notes: string | null; items: unknown; total: number; status: string; created_at: string | null };
-
-const STATUS_STYLE: Record<string, string> = {
-  nuovo: "bg-accent text-accent-foreground",
-  "in preparazione": "bg-primary text-primary-foreground",
-  pronto: "bg-secondary text-secondary-foreground",
-  ritirato: "bg-muted text-muted-foreground",
-  annullato: "bg-destructive text-destructive-foreground",
-};
-
-/** Short two-tone chime so a new order is noticed in a noisy kitchen. */
-function chime() {
-  try {
-    const ctx = new AudioContext();
-    [880, 1320].forEach((f, i) => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.frequency.value = f;
-      o.connect(g).connect(ctx.destination);
-      const t = ctx.currentTime + i * 0.18;
-      g.gain.setValueAtTime(0.25, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      o.start(t);
-      o.stop(t + 0.3);
-    });
-  } catch { /* no audio available */ }
-}
-
-function Orders() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [onlyToday, setOnlyToday] = useState(true);
-  const [sound, setSound] = useState(true);
-  const soundRef = useRef(sound);
-  soundRef.current = sound;
-
-  async function load() {
-    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(200);
-    setOrders((data ?? []) as Order[]);
-  }
-  useEffect(() => {
-    load();
-    const ch = supabase.channel(`orders-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, (p) => {
-        if (p.eventType === "INSERT") {
-          toast.success("Nuovo ordine!");
-          if (soundRef.current) chime();
-        }
-        load();
-      }).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-  async function setStatus(id: string, status: string) {
-    if (status === "annullato" && !confirm("Annullare questo ordine?")) return;
-    const { error } = await supabase.from("orders").update({ status }).eq("id", id);
-    if (error) toast.error("Errore");
-    load();
-  }
-
-  const todayKey = new Date().toDateString();
-  const shown = onlyToday ? orders.filter((o) => o.created_at && new Date(o.created_at).toDateString() === todayKey) : orders;
-  // Open orders first, by pickup time; finished ones after.
-  const done = (o: Order) => o.status === "ritirato" || o.status === "annullato";
-  const sorted = [...shown].sort((a, b) => Number(done(a)) - Number(done(b)) || (onlyToday ? a.pickup_time.localeCompare(b.pickup_time) : 0));
-  const todayTotal = shown.filter((o) => o.status !== "annullato").reduce((s, o) => s + Number(o.total), 0);
-
-  return (
-    <div className="mt-4 space-y-3">
-      <div className="flex flex-wrap items-center gap-4 text-sm">
-        <label className="flex items-center gap-2"><Switch checked={onlyToday} onCheckedChange={setOnlyToday} /> Solo oggi</label>
-        <label className="flex items-center gap-2"><Switch checked={sound} onCheckedChange={setSound} /> Suono nuovi ordini</label>
-        <span className="ml-auto text-muted-foreground">{shown.length} ordini · {euro(todayTotal)}</span>
-      </div>
-      {sorted.length === 0 && <p className="text-muted-foreground">Nessun ordine.</p>}
-      {sorted.map((o) => (
-        <div key={o.id} className={`rounded-2xl bg-card p-4 ${done(o) ? "opacity-50" : ""}`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-lg font-bold">Ritiro {o.pickup_time} · {o.customer_name} · <a href={`tel:${o.phone}`} className="text-accent">{o.phone}</a></p>
-              <p className="text-sm text-muted-foreground">#{o.public_code} · {o.created_at && new Date(o.created_at).toLocaleString("it-IT")}</p>
-            </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${STATUS_STYLE[o.status] ?? "bg-secondary"}`}>{o.status}</span>
-          </div>
-          <ul className="mt-2 text-sm">
-            {(o.items as OrderLine[]).map((l, i) => (
-              <li key={i}>
-                <b>{l.qty}×</b> {l.name}
-                {l.options && l.options.length > 0 && <span className="text-accent"> + {l.options.join(", ")}</span>}
-              </li>
-            ))}
-          </ul>
-          {o.notes && <p className="mt-1 text-sm italic">“{o.notes}”</p>}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="mr-auto font-bold text-accent">{euro(o.total)}</span>
-            <Button size="sm" variant="secondary" onClick={() => setStatus(o.id, "in preparazione")}>In preparazione</Button>
-            <Button size="sm" variant="secondary" onClick={() => setStatus(o.id, "pronto")}>Pronto</Button>
-            <Button size="sm" onClick={() => setStatus(o.id, "ritirato")}>Ritirato</Button>
-            <Button size="sm" variant="destructive" onClick={() => setStatus(o.id, "annullato")}>Annulla</Button>
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 

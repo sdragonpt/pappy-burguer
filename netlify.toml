@@ -7,3 +7,11 @@
   NODE_VERSION = "22"
   # Nitro auto-detects Netlify in its CI; pinned so local `netlify deploy --build` builds the same thing.
   NITRO_PRESET = "netlify"
+
+# Static files (JS, CSS, images) are served by the CDN, not by src/server.ts, so they get the basic headers here.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"

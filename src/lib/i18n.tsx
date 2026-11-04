@@ -59,6 +59,7 @@ const it = {
   "err.invalid_name": "Inserisci il tuo nome.",
   "err.item_unavailable": "Un prodotto nel carrello non è più disponibile. Rimuovilo e riprova.",
   "err.rate_limited": "Troppi ordini in poco tempo. Chiamaci per completare l'ordine.",
+  "err.kitchen_busy": "La cucina è al completo in questo momento. Riprova tra qualche minuto o chiamaci.",
   "err.generic": "Impossibile inviare l'ordine. Riprova.",
 
   "track.title": "Ordine {code}",
@@ -158,6 +159,7 @@ const en: Record<Key, string> = {
   "err.invalid_name": "Please enter your name.",
   "err.item_unavailable": "An item in your cart is no longer available. Remove it and try again.",
   "err.rate_limited": "Too many orders in a short time. Please call us to complete your order.",
+  "err.kitchen_busy": "The kitchen is fully booked right now. Please try again in a few minutes or call us.",
   "err.generic": "We couldn't send your order. Please try again.",
 
   "track.title": "Order {code}",

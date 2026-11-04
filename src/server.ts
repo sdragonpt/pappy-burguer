@@ -44,18 +44,52 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// The browser may only talk to this site and to the Supabase project; pages can't be framed (clickjacking).
+// Scripts keep 'unsafe-inline' because SSR hydration data is inlined, but no third-party script can load.
+function securityHeaders(): Record<string, string> {
+  const supabase = (process.env["SUPABASE_URL"] ?? import.meta.env["VITE_SUPABASE_URL"] ?? "").replace(/\/+$/, "");
+  const supabaseWs = supabase.replace(/^https:/, "wss:");
+  return {
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      `img-src 'self' data: blob: ${supabase}`,
+      "font-src 'self' data:",
+      `connect-src 'self' ${supabase} ${supabaseWs}`,
+      "worker-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+    ].join("; "),
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  };
+}
+
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(securityHeaders())) if (!headers.has(k)) headers.set(k, v);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };
